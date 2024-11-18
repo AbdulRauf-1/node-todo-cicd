@@ -1,0 +1,119 @@
+Make a AWS EC2 instance with ubuntu image
+Connect EC2 instance with ubuntu to install jenkins
+
+Commands:
+sudo apt update
+    2  sudo apt install openjdk-21-jre
+    3  java -version
+    4  curl -fsSL https://pkg.jenkins.io/debian/jenkins.io.key | sudo tee \   /usr/share/keyrings/jenkins-keyring.asc > /dev/null 
+    5  echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \   https://pkg.jenkins.io/debian binary/ | sudo tee \   /etc/apt/sources.list.d/jenkins.list > /dev/null
+    6  sudo apt-get update 
+    7  sudo apt-get install jenkins
+    8  sudo systemctl enable jenkins
+    9  sudo systemctl start jenkins
+   10  sudo systemctl status jenkins
+   11  sudo cat /var/lib/jenkins/secrets/initialAdminPassword 
+After running the 10 commands, go to the security of your EC2 instance. Add inbound rules to the security group. 
+TCP →port:8080 → ip(my IP)  → internet (publicIP:8080) → jenkins
+
+Create account in jenkins
+
+Make a new item free style project in jenkins. Provide it with the github repo and make a github credential with a private key to integrate github and jenkins.
+
+Make a build for the jenkins projects → console output →successful →  it shows the path where github files are stored.
+Go to ec2 ubuntu → go to folder(path in jenkins output) → run commands needed to run the application.
+Commands: 
+sudo apt install nodejs
+sudo apt install npm
+npm install
+node app.js
+
+After running the above command, it provides you with a link. Now, we need to add it to ec2 security group inbound rule. Now, we can see that our link is opening for the app.
+
+The node js application is working only for me. So, I will use a docker container for it, to be available for anyone.
+
+EC2 Ubuntu:
+Install docker
+Commands:
+sudo apt install docker.io
+sudo usermod -a -G docker $USER (for deamon)
+sudo reboot
+
+Make a Dockerfile
+Dockerfile:
+FROM node:12.2.0-alpine
+WORKDIR app
+COPY . .
+RUN npm install
+EXPOSE 8000
+CMD ["node","app.js"]
+
+docker build . -t todo-node-app
+docker run -d --name node-todo-app -p 8000:8000 todo-node-app
+
+Now, open the link for the node app. It will be working.
+
+To automate the process, get the code from github, run the container.
+Jenkins → configure → build → execute shell → add docker build and run command → save
+Build the docker image
+OR
+Add this script in the build of your job
+#!/bin/bash
+
+# Define your container name
+CONTAINER_NAME="node-todo-app"
+IMAGE_NAME="todo-node-app"
+
+# Stop and remove the container if it exists
+if [ "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
+    echo "Stopping and removing existing container ${CONTAINER_NAME}"
+    docker stop ${CONTAINER_NAME}
+    docker rm ${CONTAINER_NAME}
+fi
+
+# Optionally, remove the Docker image
+# docker rmi ${IMAGE_NAME}
+
+# Build the Docker image (optional tag)
+docker build . -t ${IMAGE_NAME}
+
+# Run the Docker container
+docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}
+
+
+
+Error in build: permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock
+Solution: run commands in ec2 ubuntu
+sudo usermod -a -G docker jenkins
+sudo systemctl restart jenkins
+Again, run the build and error will be resolved
+
+
+In jenkins, we are clicking on the button to build it. If we want to even automate this, we will use webhooks. Whenever we push the code to github it will automatically run the build in jenkins.
+
+Jenkins→ manage jenkins → plugins → available plugins → github integration → install
+
+Github repo → settings → webhooks → payload url (jenkins) → application/json → add
+Make changes to the repo and push the code. Jenkins will automatically run the build. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
